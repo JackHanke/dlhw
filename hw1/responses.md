@@ -43,7 +43,15 @@ d. Yes, Hinge would be a good choice for training an MLP for classification, bec
 
 ## Question 2
 
+We create a single-layer perceptron with two weights and a bias. The equation is as follows
 
+$$g(X) = Xw + b.$$
+
+As we did not have any hidden neurons, we had no architectural hyperparameters. As for training hyperparameters, we chose to train over $1000$ epochs at a learning rate of $0.01$. These training hyperparameters were found via trial and error, viewing the associated loss curves for each attempt. 
+
+We cannot use the perceptron algorithm on this learning task, as the data is not linearly seperable. This can be clearly seen from the plots of the original and augmented data. 
+
+We split the dataset into 64% for training, 20% for validating, 16% for testing. 
 
 ## Question 3
 ### a. 
@@ -71,5 +79,3 @@ The fifth panel shows the *decision boundary* learned by the model. This plot he
 The final panel shows *test set classification results*, showing the final performance of the trained model on unseen data. This panel evaluates the generalization ability of the model and determines whether it is good enough for deployment.
 
 ## Question 4
-
-
