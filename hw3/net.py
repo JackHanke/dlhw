@@ -25,7 +25,7 @@ def get_dataloaders(window_size, batch_size):
     with open('wiki2tokenized.train.pkl', 'rb') as f:
         train_token_list = pickle.load(f)
         train_dataset = TokenDataSet(token_list=train_token_list, window_size=window_size)
-        train_dataloader = DataLoader(dataset=train_dataset, batch_size = batch_size, shuffle=False)
+        train_dataloader = DataLoader(dataset=train_dataset, batch_size = batch_size, shuffle=True)
 
     with open('wiki2tokenized.valid.pkl', 'rb') as f:
         valid_token_list = pickle.load(f)
@@ -39,7 +39,7 @@ def get_dataloaders(window_size, batch_size):
 
     return train_dataloader, valid_dataloader, test_dataloader
 
-# TODO dropout?
+# 
 class RNNLangModel(nn.Module):
     def __init__(self, hidden_size):
         super().__init__()
@@ -64,25 +64,58 @@ class RNNLangModel(nn.Module):
             
     def forward(self, x):
         embedded_x = self.embeddings(x)
-        pred, hidden = self.rnn.forward(self.dropout(embedded_x))
         pred, hidden = self.rnn.forward(embedded_x)
-
-        # hidden = self.dropout_again(self.U.forward(hidden).squeeze(0))
-        hidden = self.U.forward(hidden).squeeze(0)
-        return hidden
+        output = self.U.forward(hidden).squeeze(0)
+        return output
         
+# 
+class RNNLangModelImproved(nn.Module):
+    def __init__(self, hidden_size):
+        super().__init__()
+        self.dropout = torch.nn.Dropout(p=0.1)
+        self.dropout_again = torch.nn.Dropout(p=0.1)
+        self.embeddings = torch.nn.Embedding(
+            num_embeddings=9892, 
+            embedding_dim=100
+        )
+        self.rnn = torch.nn.RNN(
+            input_size=100,
+            hidden_size=hidden_size,
+            num_layers=2,
+            dropout=0.1 ,
+            nonlinearity='tanh',
+            bias=True,
+            batch_first=True
+        )
+        self.U = torch.nn.Linear(
+            in_features=hidden_size,
+            out_features=9892
+        )
+            
+    def forward(self, x):
+        embedded_x = self.embeddings(x)
+        pred, hidden = self.rnn.forward(embedded_x)
+        # print(hidden.shape)
+        # print(pred[:, -1, :].shape)
+        # output = self.U.forward(hidden).squeeze(0)
+        output = self.U.forward(pred[:, -1, :])
+        # print(self.U.forward(hidden).shape)
+        # input(output.shape)
+        return output
+
 
 if __name__ == '__main__':
     torch.manual_seed(0)
     # get GPU if available
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # get model
-    net = RNNLangModel(hidden_size=200)
+    # net = RNNLangModel(hidden_size = 30)
+    net = RNNLangModelImproved(hidden_size = 30)
     net.to(device)
     # get dataloaders for each split
-    train_dataloader, valid_dataloader, test_dataloader = get_dataloaders(window_size = 30, batch_size = 128)
+    train_dataloader, valid_dataloader, test_dataloader = get_dataloaders(window_size = 10, batch_size = 256)
     # optimizer and loss
-    optim = torch.optim.Adam(net.parameters(), lr=0.001)
+    optim = torch.optim.Adam(net.parameters())
     loss_fn = torch.nn.CrossEntropyLoss()
     # logging
     best_loss = float('inf')
@@ -108,9 +141,10 @@ if __name__ == '__main__':
             train_loss = loss_fn(prediction_logits, next_tokens)
             running_loss += train_loss.item()
             average_loss = running_loss / (batch_index + 1)
-
             # backprop
             train_loss.backward()
+            # gradient clipping
+            nn.utils.clip_grad_norm_(net.parameters(), 2)
             # update weights
             optim.step()
             # compute training perplexity
